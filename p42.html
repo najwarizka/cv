@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deteksi Objek Haar Cascade & Pengolahan Citra - OpenCV.js</title>
+    <title>Deteksi Objek Haar Cascade & Pengolahan Citra + Efek Bokeh - OpenCV.js</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -38,8 +38,8 @@
                     <i data-lucide="scan-face" class="w-6 h-6"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg leading-tight text-white">OpenCV.js Haar Detection</h1>
-                    <p class="text-xs text-slate-400">Pra-pemrosesan Citra & Morfologi Real-Time</p>
+                    <h1 class="font-bold text-lg leading-tight text-white">OpenCV.js Haar & Bokeh Processing</h1>
+                    <p class="text-xs text-slate-400">Pra-pemrosesan Citra, Morfologi & Modus Potret Bokeh Real-Time</p>
                 </div>
             </div>
             
@@ -81,11 +81,11 @@
                     </div>
                 </div>
 
-                <!-- Processed Filter Feed -->
+                <!-- Processed Filter / Bokeh Feed -->
                 <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3 shadow-lg flex flex-col">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                            <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-amber-400"></i> Hasil Pra-pemrosesan
+                            <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-amber-400"></i> Hasil Filter / Bokeh
                         </span>
                         <span id="active-mode-label" class="text-[10px] font-mono bg-slate-900 px-2 py-0.5 rounded text-indigo-300 border border-slate-700">GRAYSCALE</span>
                     </div>
@@ -117,13 +117,13 @@
             <!-- Descriptive Notes -->
             <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 text-xs text-slate-400 space-y-2">
                 <div class="font-semibold text-slate-300 flex items-center gap-1.5">
-                    <i data-lucide="info" class="w-4 h-4 text-indigo-400"></i> Alur Kerja Pengolahan Citra:
+                    <i data-lucide="info" class="w-4 h-4 text-indigo-400"></i> Alur Kerja Pengolahan Citra & Efek Bokeh:
                 </div>
                 <p class="leading-relaxed">
                     1. Frame Webcam dikonversi ke <strong>Grayscale</strong> untuk komputasi lebih cepat.<br>
                     2. Diberlakukan <strong>Thresholding</strong> (Binary/Otsu/Adaptive) untuk memisahkan latar belakang.<br>
                     3. Operasi <strong>Morfologi (Erosi, Dilasi, Opening, Closing)</strong> diterapkan untuk membersihkan noise atau menutup lubang area spasial.<br>
-                    4. Algoritma <strong>Haar Cascade</strong> mendeteksi fitur geometris (Wajah & Mata) dari frame hasil/original.
+                    4. Modus <strong>Bokeh / Portret</strong> mengisolasi area objek/wajah foreground dan mengaplikasikan Gaussian Blur intensitas tinggi pada latar belakang (background).
                 </p>
             </div>
         </div>
@@ -132,7 +132,7 @@
         <div class="lg:col-span-5 space-y-4">
             
             <!-- Controls Container -->
-            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 shadow-lg space-y-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 shadow-lg space-y-5">
                 <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200 border-b border-slate-700/80 pb-2 flex items-center justify-between">
                     <span>Pengaturan Citra & Filter</span>
                     <i data-lucide="settings-2" class="w-4 h-4 text-slate-400"></i>
@@ -145,11 +145,12 @@
                         <option value="none">1. None / Original Grayscale</option>
                         <option value="threshold">2. Thresholding</option>
                         <option value="morphology">3. Morphological Operations</option>
+                        <option value="bokeh">4. Bokeh Mode (Isolasi Objek + Blur Latar)</option>
                     </select>
                 </div>
 
                 <!-- 2. Thresholding Options -->
-                <div id="section-threshold" class="space-y-3 bg-slate-900/50 p-3.5 rounded-lg border border-slate-700/50">
+                <div id="section-threshold" class="space-y-3 bg-slate-900/50 p-3.5 rounded-lg border border-slate-700/50 hidden">
                     <span class="text-xs font-semibold text-indigo-400 block border-b border-slate-800 pb-1">Konfigurasi Thresholding</span>
                     
                     <div class="space-y-2">
@@ -172,7 +173,7 @@
                 </div>
 
                 <!-- 3. Morphology Options -->
-                <div id="section-morphology" class="space-y-3 bg-slate-900/50 p-3.5 rounded-lg border border-slate-700/50">
+                <div id="section-morphology" class="space-y-3 bg-slate-900/50 p-3.5 rounded-lg border border-slate-700/50 hidden">
                     <span class="text-xs font-semibold text-amber-400 block border-b border-slate-800 pb-1">Operasi Morfologi</span>
                     
                     <div class="space-y-2">
@@ -204,7 +205,41 @@
                     </div>
                 </div>
 
-                <!-- 4. Haar Cascade Hyperparameters -->
+                <!-- 4. Bokeh Options -->
+                <div id="section-bokeh" class="space-y-3 bg-slate-900/50 p-3.5 rounded-lg border border-slate-700/50">
+                    <span class="text-xs font-semibold text-pink-400 block border-b border-slate-800 pb-1 flex items-center justify-between">
+                        <span>Konfigurasi Bokeh / Blur Latar</span>
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-pink-400"></i>
+                    </span>
+
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-300 block">Metode Segmentasi Latar</label>
+                        <select id="select-bokeh-method" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-slate-200">
+                            <option value="haar">Deteksi Haar Cascade (Wajah/Objek)</option>
+                            <option value="center">Masking Oval Tengah (Center Subject)</option>
+                        </select>
+                    </div>
+
+                    <!-- Bokeh Blur Radius Slider -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs text-slate-300">
+                            <span>Intensitas Blur Latar (Blur Radius)</span>
+                            <span id="val-bokeh-blur" class="font-mono text-pink-400">25 px</span>
+                        </div>
+                        <input id="slider-bokeh-blur" type="range" min="3" max="55" step="2" value="25" class="w-full accent-pink-500 bg-slate-700 h-1.5 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <!-- Feather / Soft Edge Radius Slider -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs text-slate-300">
+                            <span>Kelembutan Celah Edge (Feather Radius)</span>
+                            <span id="val-bokeh-feather" class="font-mono text-pink-400">15 px</span>
+                        </div>
+                        <input id="slider-bokeh-feather" type="range" min="1" max="45" step="2" value="15" class="w-full accent-pink-500 bg-slate-700 h-1.5 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- 5. Haar Cascade Hyperparameters -->
                 <div class="space-y-3 bg-slate-900/50 p-3.5 rounded-lg border border-slate-700/50">
                     <span class="text-xs font-semibold text-teal-400 block border-b border-slate-800 pb-1">Parameter Haar Cascade</span>
 
@@ -265,6 +300,15 @@
         let processedMat = null;
         let tempMat = null;
         let dstMat = null;
+
+        // Mats for Bokeh Effect
+        let blurBgMat = null;
+        let maskMat = null;
+        let mask3ChanMat = null;
+        let invMask3ChanMat = null;
+        let fgMat = null;
+        let bgBlendedMat = null;
+
         let facesRects = null;
         let eyesRects = null;
 
@@ -290,13 +334,22 @@
         const selectThreshType = document.getElementById('select-thresh-type');
         const sliderThresh = document.getElementById('slider-thresh');
         const valThresh = document.getElementById('val-thresh');
-        const containerThreshVal = document.getElementById('container-thresh-val');
+
+        const sectionThreshold = document.getElementById('section-threshold');
+        const sectionMorphology = document.getElementById('section-morphology');
+        const sectionBokeh = document.getElementById('section-bokeh');
 
         const selectMorphOp = document.getElementById('select-morph-op');
         const sliderKernel = document.getElementById('slider-kernel');
         const valKernel = document.getElementById('val-kernel');
         const sliderIterations = document.getElementById('slider-iterations');
         const valIterations = document.getElementById('val-iterations');
+
+        const selectBokehMethod = document.getElementById('select-bokeh-method');
+        const sliderBokehBlur = document.getElementById('slider-bokeh-blur');
+        const valBokehBlur = document.getElementById('val-bokeh-blur');
+        const sliderBokehFeather = document.getElementById('slider-bokeh-feather');
+        const valBokehFeather = document.getElementById('val-bokeh-feather');
 
         const chkDetectFace = document.getElementById('chk-detect-face');
         const chkDetectEye = document.getElementById('chk-detect-eye');
@@ -312,12 +365,27 @@
 
         lucide.createIcons();
 
-        // UI Event Listeners for Sliders Update
+        // UI Event Listeners for Sliders & UI Toggle
         sliderThresh.addEventListener('input', (e) => valThresh.innerText = e.target.value);
         sliderKernel.addEventListener('input', (e) => valKernel.innerText = `${e.target.value}x${e.target.value}`);
         sliderIterations.addEventListener('input', (e) => valIterations.innerText = e.target.value);
         sliderScaleFactor.addEventListener('input', (e) => valScaleFactor.innerText = parseFloat(e.target.value).toFixed(2));
         sliderMinNeighbors.addEventListener('input', (e) => valMinNeighbors.innerText = e.target.value);
+        sliderBokehBlur.addEventListener('input', (e) => valBokehBlur.innerText = `${e.target.value} px`);
+        sliderBokehFeather.addEventListener('input', (e) => valBokehFeather.innerText = `${e.target.value} px`);
+
+        selectPipelineMode.addEventListener('change', (e) => {
+            const val = e.target.value;
+            sectionThreshold.classList.toggle('hidden', val !== 'threshold');
+            sectionMorphology.classList.toggle('hidden', val !== 'morphology');
+            sectionBokeh.classList.toggle('hidden', val !== 'bokeh');
+        });
+
+        // Initialize section visibilities on start
+        sectionThreshold.classList.add('hidden');
+        sectionMorphology.classList.add('hidden');
+        sectionBokeh.classList.remove('hidden');
+        selectPipelineMode.value = 'bokeh';
 
         async function onOpenCvReady() {
             updateStatus('Memuat berkas Haar Cascade...', 'amber');
@@ -403,6 +471,14 @@
                 processedMat = new cv.Mat(height, width, cv.CV_8UC1);
                 tempMat = new cv.Mat(height, width, cv.CV_8UC1);
                 dstMat = new cv.Mat(height, width, cv.CV_8UC4);
+
+                blurBgMat = new cv.Mat(height, width, cv.CV_8UC3);
+                maskMat = new cv.Mat(height, width, cv.CV_8UC1);
+                mask3ChanMat = new cv.Mat(height, width, cv.CV_8UC3);
+                invMask3ChanMat = new cv.Mat(height, width, cv.CV_8UC3);
+                fgMat = new cv.Mat(height, width, cv.CV_8UC3);
+                bgBlendedMat = new cv.Mat(height, width, cv.CV_8UC3);
+
                 facesRects = new cv.RectVector();
                 eyesRects = new cv.RectVector();
 
@@ -431,6 +507,14 @@
             if (processedMat) processedMat.delete();
             if (tempMat) tempMat.delete();
             if (dstMat) dstMat.delete();
+
+            if (blurBgMat) blurBgMat.delete();
+            if (maskMat) maskMat.delete();
+            if (mask3ChanMat) mask3ChanMat.delete();
+            if (invMask3ChanMat) invMask3ChanMat.delete();
+            if (fgMat) fgMat.delete();
+            if (bgBlendedMat) bgBlendedMat.delete();
+
             if (facesRects) facesRects.delete();
             if (eyesRects) eyesRects.delete();
 
@@ -466,42 +550,48 @@
 
                 cv.cvtColor(srcMat, grayMat, cv.COLOR_RGBA2GRAY);
 
-                const mode = selectPipelineMode.value;
-                applyImagePipeline(mode);
-
-                cv.imshow('canvas-processed', processedMat);
-
                 let faceDetectedCount = 0;
                 let eyeDetectedCount = 0;
 
-                if (isDetecting) {
-                    const scaleFactor = parseFloat(sliderScaleFactor.value);
-                    const minNeighbors = parseInt(sliderMinNeighbors.value);
-                    const detectionSourceMat = (mode === 'none') ? grayMat : processedMat;
+                const scaleFactor = parseFloat(sliderScaleFactor.value);
+                const minNeighbors = parseInt(sliderMinNeighbors.value);
 
-                    if (chkDetectFace.checked && faceCascade) {
-                        faceCascade.detectMultiScale(detectionSourceMat, facesRects, scaleFactor, minNeighbors, 0, new cv.Size(30, 30));
-                        faceDetectedCount = facesRects.size();
+                // Jalankan deteksi Haar Cascade
+                if (isDetecting && faceCascade) {
+                    faceCascade.detectMultiScale(grayMat, facesRects, scaleFactor, minNeighbors, 0, new cv.Size(30, 30));
+                    faceDetectedCount = facesRects.size();
+                }
 
-                        for (let i = 0; i < facesRects.size(); ++i) {
-                            let face = facesRects.get(i);
-                            let point1 = new cv.Point(face.x, face.y);
-                            let point2 = new cv.Point(face.x + face.width, face.y + face.height);
-                            cv.rectangle(srcMat, point1, point2, [99, 102, 241, 255], 2);
+                const mode = selectPipelineMode.value;
+                applyImagePipeline(mode);
 
-                            if (chkDetectEye.checked && eyeCascade) {
-                                let faceROI = detectionSourceMat.roi(face);
-                                eyeCascade.detectMultiScale(faceROI, eyesRects, scaleFactor, minNeighbors, 0, new cv.Size(15, 15));
-                                eyeDetectedCount += eyesRects.size();
+                // Tampilkan hasil pra-pemrosesan/Bokeh pada canvas kanan
+                if (mode === 'bokeh') {
+                    cv.imshow('canvas-processed', bgBlendedMat);
+                } else {
+                    cv.imshow('canvas-processed', processedMat);
+                }
 
-                                for (let j = 0; j < eyesRects.size(); ++j) {
-                                    let eye = eyesRects.get(j);
-                                    let ePoint1 = new cv.Point(face.x + eye.x, face.y + eye.y);
-                                    let ePoint2 = new cv.Point(face.x + eye.x + eye.width, face.y + eye.y + eye.height);
-                                    cv.rectangle(srcMat, ePoint1, ePoint2, [20, 184, 166, 255], 1.5);
-                                }
-                                faceROI.delete();
+                // Render Bounding Box pada Canvas Kiri (Input)
+                if (isDetecting && chkDetectFace.checked) {
+                    for (let i = 0; i < facesRects.size(); ++i) {
+                        let face = facesRects.get(i);
+                        let point1 = new cv.Point(face.x, face.y);
+                        let point2 = new cv.Point(face.x + face.width, face.y + face.height);
+                        cv.rectangle(srcMat, point1, point2, [99, 102, 241, 255], 2);
+
+                        if (chkDetectEye.checked && eyeCascade) {
+                            let faceROI = grayMat.roi(face);
+                            eyeCascade.detectMultiScale(faceROI, eyesRects, scaleFactor, minNeighbors, 0, new cv.Size(15, 15));
+                            eyeDetectedCount += eyesRects.size();
+
+                            for (let j = 0; j < eyesRects.size(); ++j) {
+                                let eye = eyesRects.get(j);
+                                let ePoint1 = new cv.Point(face.x + eye.x, face.y + eye.y);
+                                let ePoint2 = new cv.Point(face.x + eye.x + eye.width, face.y + eye.y + eye.height);
+                                cv.rectangle(srcMat, ePoint1, ePoint2, [20, 184, 166, 255], 1.5);
                             }
+                            faceROI.delete();
                         }
                     }
                 }
@@ -542,7 +632,6 @@
             } else if (mode === 'morphology') {
                 activeModeLabel.innerText = "MORFOLOGI";
                 
-                // Pastikan binerisasi awal agar operasi morfologi bekerja optimal pada objek
                 cv.threshold(grayMat, tempMat, 127, 255, cv.THRESH_BINARY);
 
                 const morphOp = selectMorphOp.value;
@@ -556,13 +645,91 @@
                 } else if (morphOp === 'dilate') {
                     cv.dilate(tempMat, processedMat, M, anchor, iterations);
                 } else if (morphOp === 'open') {
-                    // Opening: Erosi dilanjutkan Dilasi
                     cv.morphologyEx(tempMat, processedMat, cv.MORPH_OPEN, M, anchor, iterations);
                 } else if (morphOp === 'close') {
-                    // Closing: Dilasi dilanjutkan Erosi
                     cv.morphologyEx(tempMat, processedMat, cv.MORPH_CLOSE, M, anchor, iterations);
                 }
                 M.delete();
+            } else if (mode === 'bokeh') {
+                activeModeLabel.innerText = "PORTRAIT BOKEH";
+
+                // 1. Konversi Frame RGBA ke RGB
+                let srcRgb = new cv.Mat();
+                cv.cvtColor(srcMat, srcRgb, cv.COLOR_RGBA2RGB);
+
+                // 2. Buat Blur Latar Belakang (Bokeh Radius)
+                let blurRadius = parseInt(sliderBokehBlur.value);
+                if (blurRadius % 2 === 0) blurRadius += 1; // Ukuran kernel Gaussian harus ganjil
+                cv.GaussianBlur(srcRgb, blurBgMat, new cv.Size(blurRadius, blurRadius), 0, 0);
+
+                // 3. Inisialisasi Masking Hitam (0)
+                maskMat.setTo(new cv.Scalar(0));
+
+                const bokehMethod = selectBokehMethod.value;
+
+                if (bokehMethod === 'haar' && facesRects && facesRects.size() > 0) {
+                    // Buat area elips lembut pada setiap wajah yang terdeteksi
+                    for (let i = 0; i < facesRects.size(); ++i) {
+                        let face = facesRects.get(i);
+                        let center = new cv.Point(face.x + face.width / 2, face.y + face.height / 2);
+                        let axes = new cv.Size(Math.round(face.width * 0.7), Math.round(face.height * 0.9));
+                        cv.ellipse(maskMat, center, axes, 0, 0, 360, new cv.Scalar(255), -1);
+                    }
+                } else {
+                    // Fallback: Mask Oval Tengah jika tidak ada wajah atau menggunakan mode Center Subject
+                    let center = new cv.Point(srcMat.cols / 2, srcMat.rows / 2);
+                    let axes = new cv.Size(Math.round(srcMat.cols * 0.3), Math.round(srcMat.rows * 0.45));
+                    cv.ellipse(maskMat, center, axes, 0, 0, 360, new cv.Scalar(255), -1);
+                }
+
+                // 4. Haluskan Tepi Mask (Feathering Edge) untuk Efek Transisi Transparan yang Mulus
+                let featherRadius = parseInt(sliderBokehFeather.value);
+                if (featherRadius % 2 === 0) featherRadius += 1;
+                cv.GaussianBlur(maskMat, maskMat, new cv.Size(featherRadius, featherRadius), 0, 0);
+
+                // 5. Gabungkan Foreground dan Blurred Background berdasarkan Alpha Weight Mask
+                // Konversi Mask 1-Channel ke 3-Channel Float (0.0 s/d 1.0)
+                let maskFloat = new cv.Mat();
+                maskMat.convertTo(maskFloat, cv.CV_32FC1, 1.0 / 255.0);
+
+                let mask3F = new cv.Mat();
+                let channels = new cv.MatVector();
+                channels.push_back(maskFloat);
+                channels.push_back(maskFloat);
+                channels.push_back(maskFloat);
+                cv.merge(channels, mask3F);
+
+                let srcFloat = new cv.Mat();
+                let blurFloat = new cv.Mat();
+                srcRgb.convertTo(srcFloat, cv.CV_32FC3);
+                blurBgMat.convertTo(blurFloat, cv.CV_32FC3);
+
+                // Formulasi Matriks Alpha Blending: Result = Src * Mask + Blur * (1 - Mask)
+                let invMask3F = new cv.Mat();
+                let ones = new cv.Mat(srcMat.rows, srcMat.cols, cv.CV_32FC3, new cv.Scalar(1.0, 1.0, 1.0));
+                cv.subtract(ones, mask3F, invMask3F);
+
+                let fgPart = new cv.Mat();
+                let bgPart = new cv.Mat();
+                cv.multiply(srcFloat, mask3F, fgPart);
+                cv.multiply(blurFloat, invMask3F, bgPart);
+
+                let blendedFloat = new cv.Mat();
+                cv.add(fgPart, bgPart, blendedFloat);
+                blendedFloat.convertTo(bgBlendedMat, cv.CV_8UC3);
+
+                // Memory Cleanup Matriks Sementara
+                srcRgb.delete();
+                maskFloat.delete();
+                mask3F.delete();
+                channels.delete();
+                srcFloat.delete();
+                blurFloat.delete();
+                invMask3F.delete();
+                ones.delete();
+                fgPart.delete();
+                bgPart.delete();
+                blendedFloat.delete();
             }
         }
     </script>
