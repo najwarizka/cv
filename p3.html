@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenCV.js Object Detection & Preprocessing Lab</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Header Section -->
+    <header class="bg-gray-800 border-b border-gray-700 px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-eye text-sky-400 text-2xl"></i>
+            <div>
+                <h1 class="text-xl font-bold tracking-wide text-white">OpenCV.js Vision Studio</h1>
+                <p class="text-xs text-gray-400">Haar Cascade Detection with Morphological & Thresholding Controls</p>
+            </div>
+        </div>
+
+        <!-- Status Indicator & Stats -->
+        <div class="flex items-center gap-4 text-sm">
+            <div id="cvStatus" class="flex items-center gap-2 bg-yellow-500/20 text-yellow-300 px-3 py-1.5 rounded-full border border-yellow-500/30">
+                <i class="fa-solid fa-spinner animate-spin"></i>
+                <span class="text-xs font-semibold">Loading OpenCV.js...</span>
+            </div>
+            <div class="bg-gray-700 px-3 py-1.5 rounded-lg flex items-center gap-3 text-xs border border-gray-600">
+                <span>FPS: <strong id="fpsCount" class="text-sky-400">0</strong></span>
+                <span class="text-gray-500">|</span>
+                <span>Detections: <strong id="detectCount" class="text-emerald-400">0</strong></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 lg:p-6 overflow-hidden">
+        
+        <!-- Left/Center: Viewports (Webcam Feed & Processed Feed) -->
+        <div class="lg:col-span-8 flex flex-col gap-4">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
+                <!-- Source & Detection Canvas -->
+                <div class="bg-gray-800 rounded-xl p-3 border border-gray-700 flex flex-col">
+                    <div class="flex justify-between items-center mb-2 px-1">
+                        <span class="text-xs font-semibold text-gray-300 flex items-center gap-2">
+                            <i class="fa-solid fa-video text-sky-400"></i> Kamera & Visual Deteksi
+                        </span>
+                        <span class="text-[10px] bg-gray-700 text-gray-300 px-2 py-0.5 rounded">RGB Overlay</span>
+                    </div>
+                    <div class="relative flex-1 bg-black rounded-lg overflow-hidden min-h-[280px] flex items-center justify-center border border-gray-900">
+                        <!-- Hidden Video Element -->
+                        <video id="videoInput" class="hidden" playsinline></video>
+                        <!-- Detection Overlay Canvas -->
+                        <canvas id="canvasOutput" class="w-full h-full object-contain"></canvas>
+                        
+                        <!-- Overlay Loading Shield -->
+                        <div id="cameraShield" class="absolute inset-0 bg-gray-900/90 flex flex-col items-center justify-center p-6 text-center">
+                            <i class="fa-solid fa-camera text-4xl text-gray-600 mb-3"></i>
+                            <p class="text-sm text-gray-300 mb-4">Akses kamera diperlukan untuk pemrosesan citra real-time.</p>
+                            <button id="btnStartCam" disabled class="bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-2 shadow-lg">
+                                <i class="fa-solid fa-play"></i> Mulai Kamera
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preprocessed Image Viewport -->
+                <div class="bg-gray-800 rounded-xl p-3 border border-gray-700 flex flex-col">
+                    <div class="flex justify-between items-center mb-2 px-1">
+                        <span class="text-xs font-semibold text-gray-300 flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-emerald-400"></i> Hasil Preprocessing
+                        </span>
+                        <span class="text-[10px] bg-gray-700 text-gray-300 px-2 py-0.5 rounded">Binary/Morphology View</span>
+                    </div>
+                    <div class="relative flex-1 bg-black rounded-lg overflow-hidden min-h-[280px] flex items-center justify-center border border-gray-900">
+                        <canvas id="canvasPreprocessed" class="w-full h-full object-contain"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls Quick Bar -->
+            <div class="bg-gray-800 border border-gray-700 rounded-xl p-3 flex flex-wrap items-center justify-between gap-4 text-xs">
+                <div class="flex items-center gap-3">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="toggleDetection" checked class="rounded bg-gray-700 border-gray-600 text-sky-500 focus:ring-sky-500">
+                        <span>Aktifkan Haar Cascade</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="useProcessedForDetect" class="rounded bg-gray-700 border-gray-600 text-sky-500 focus:ring-sky-500">
+                        <span class="text-yellow-400 font-medium">Gunakan Citra Preprocessing untuk Deteksi</span>
+                    </label>
+                </div>
+                <button id="btnResetParams" class="text-gray-400 hover:text-white flex items-center gap-1 transition">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Parameter
+                </button>
+            </div>
+
+        </div>
+
+        <!-- Right Side: Control Panels & Parameters -->
+        <div class="lg:col-span-4 bg-gray-800 rounded-xl border border-gray-700 flex flex-col overflow-hidden">
+            <!-- Tabs Header -->
+            <div class="flex border-b border-gray-700 bg-gray-800/80">
+                <button id="tabBtn1" onclick="switchTab('preprocessing')" class="flex-1 py-3 text-xs font-semibold border-b-2 border-sky-400 text-sky-400 flex items-center justify-center gap-1.5 transition">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Preprocessing
+                </button>
+                <button id="tabBtn2" onclick="switchTab('cascade')" class="flex-1 py-3 text-xs font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-200 flex items-center justify-center gap-1.5 transition">
+                    <i class="fa-solid fa-microchip"></i> Cascade Classifier
+                </button>
+            </div>
+
+            <!-- Scrollable Controls Body -->
+            <div class="p-4 overflow-y-auto flex-1 space-y-6">
+                
+                <!-- Tab 1: Image Preprocessing Controls -->
+                <div id="tabPreprocessing" class="space-y-5">
+                    
+                    <!-- Color & Contrast Adjustments -->
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-sun text-yellow-400"></i> Brightness & Contrast
+                        </h3>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>Brightness (Alpha)</span>
+                                <span id="valBrightness" class="font-mono text-sky-400">0</span>
+                            </div>
+                            <input type="range" id="paramBrightness" min="-100" max="100" value="0" class="w-full accent-sky-500">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>Contrast (Beta)</span>
+                                <span id="valContrast" class="font-mono text-sky-400">1.0</span>
+                            </div>
+                            <input type="range" id="paramContrast" min="0.5" max="3.0" step="0.1" value="1.0" class="w-full accent-sky-500">
+                        </div>
+                    </div>
+
+                    <hr class="border-gray-700">
+
+                    <!-- Thresholding Controls -->
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-circle-half-stroke text-emerald-400"></i> Thresholding (Pengambangan)
+                        </h3>
+                        <div>
+                            <label class="block text-xs mb-1 text-gray-300">Metode Threshold</label>
+                            <select id="paramThreshType" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:ring-1 focus:ring-sky-500">
+                                <option value="none">None (Grayscale Only)</option>
+                                <option value="binary">Binary Threshold</option>
+                                <option value="binary_inv">Binary Inverted</option>
+                                <option value="otsu">Otsu Automatic</option>
+                                <option value="adaptive">Adaptive Gaussian</option>
+                            </select>
+                        </div>
+                        <div id="threshValueGroup">
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>Threshold Value</span>
+                                <span id="valThresh" class="font-mono text-emerald-400">127</span>
+                            </div>
+                            <input type="range" id="paramThreshValue" min="0" max="255" value="127" class="w-full accent-emerald-500">
+                        </div>
+                    </div>
+
+                    <hr class="border-gray-700">
+
+                    <!-- Morphological Operations -->
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-shapes text-purple-400"></i> Operasi Morfologi
+                        </h3>
+                        <div>
+                            <label class="block text-xs mb-1 text-gray-300">Tipe Operasi</label>
+                            <select id="paramMorphType" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:ring-1 focus:ring-sky-500">
+                                <option value="none">None</option>
+                                <option value="erode">Erosion (Pengikisan)</option>
+                                <option value="dilate">Dilation (Pelebaran)</option>
+                                <option value="open">Opening (Hilangkan Noise)</option>
+                                <option value="close">Closing (Tutup Lubang)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>Kernel Size</span>
+                                <span id="valKernelSize" class="font-mono text-purple-400">3x3</span>
+                            </div>
+                            <input type="range" id="paramKernelSize" min="1" max="15" step="2" value="3" class="w-full accent-purple-500">
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Tab 2: Haar Cascade Controls -->
+                <div id="tabCascade" class="space-y-5 hidden">
+                    
+                    <!-- Classifier Selection -->
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-folder-tree text-sky-400"></i> Model Cascade
+                        </h3>
+                        <div>
+                            <label class="block text-xs mb-1 text-gray-300">Pilih Target Deteksi</label>
+                            <select id="paramCascadeModel" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:ring-1 focus:ring-sky-500">
+                                <option value="haarcascade_frontalface_default.xml">Wajah (Frontal Face)</option>
+                                <option value="haarcascade_eye.xml">Mata (Eye Detection)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr class="border-gray-700">
+
+                    <!-- Detection Tuning Parameters -->
+                    <div class="space-y-4">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-sky-400"></i> Parameter Tuning
+                        </h3>
+                        
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>Scale Factor</span>
+                                <span id="valScaleFactor" class="font-mono text-sky-400">1.10</span>
+                            </div>
+                            <input type="range" id="paramScaleFactor" min="1.05" max="1.5" step="0.05" value="1.1" class="w-full accent-sky-500">
+                            <p class="text-[10px] text-gray-400 mt-1">Menentukan berapa banyak ukuran citra dikurangi pada setiap skala citra.</p>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>Min Neighbors</span>
+                                <span id="valMinNeighbors" class="font-mono text-sky-400">3</span>
+                            </div>
+                            <input type="range" id="paramMinNeighbors" min="1" max="10" value="3" class="w-full accent-sky-500">
+                            <p class="text-[10px] text-gray-400 mt-1">Berapa banyak tetangga yang harus dimiliki setiap kandidat persegi untuk mempertahankannya.</p>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span>Min Size (px)</span>
+                                <span id="valMinSize" class="font-mono text-sky-400">30x30</span>
+                            </div>
+                            <input type="range" id="paramMinSize" min="10" max="200" step="10" value="30" class="w-full accent-sky-500">
+                            <p class="text-[10px] text-gray-400 mt-1">Ukuran objek terkecil yang dapat dideteksi.</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs mb-1 text-gray-300">Warna Bounding Box</label>
+                            <input type="color" id="paramBoxColor" value="#00ff00" class="w-full h-8 bg-gray-900 border border-gray-700 rounded cursor-pointer">
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- OpenCV.js Dynamic Script Loading -->
+    <script>
+        // Global variables & state
+        let cvReady = false;
+        let stream = null;
+        let classifier = null;
+        let classifierLoaded = false;
+        let currentModelPath = 'haarcascade_frontalface_default.xml';
+        
+        let lastFrameTime = performance.now();
+        let frameCount = 0;
+        let currentFps = 0;
+
+        // Matrices for OpenCV reuse to prevent memory leaks
+        let srcMat = null;
+        let dstMat = null;
+        let grayMat = null;
+        let procMat = null;
+        let faces = null;
+
+        // Elements
+        const video = document.getElementById('videoInput');
+        const canvasOutput = document.getElementById('canvasOutput');
+        const canvasPreprocessed = document.getElementById('canvasPreprocessed');
+        const btnStartCam = document.getElementById('btnStartCam');
+        const cvStatus = document.getElementById('cvStatus');
+        const cameraShield = document.getElementById('cameraShield');
+
+        // Parameter Elements
+        const paramBrightness = document.getElementById('paramBrightness');
+        const paramContrast = document.getElementById('paramContrast');
+        const paramThreshType = document.getElementById('paramThreshType');
+        const paramThreshValue = document.getElementById('paramThreshValue');
+        const paramMorphType = document.getElementById('paramMorphType');
+        const paramKernelSize = document.getElementById('paramKernelSize');
+        
+        const paramCascadeModel = document.getElementById('paramCascadeModel');
+        const paramScaleFactor = document.getElementById('paramScaleFactor');
+        const paramMinNeighbors = document.getElementById('paramMinNeighbors');
+        const paramMinSize = document.getElementById('paramMinSize');
+        const paramBoxColor = document.getElementById('paramBoxColor');
+
+        const toggleDetection = document.getElementById('toggleDetection');
+        const useProcessedForDetect = document.getElementById('useProcessedForDetect');
+
+        // UI Label Value Sync
+        function bindSliderLabel(sliderId, labelId, formatter = v => v) {
+            const slider = document.getElementById(sliderId);
+            const label = document.getElementById(labelId);
+            slider.addEventListener('input', (e) => {
+                label.textContent = formatter(e.target.value);
+            });
+        }
+
+        bindSliderLabel('paramBrightness', 'valBrightness');
+        bindSliderLabel('paramContrast', 'valContrast', v => parseFloat(v).toFixed(1));
+        bindSliderLabel('paramThreshValue', 'valThresh');
+        bindSliderLabel('paramKernelSize', 'valKernelSize', v => `${v}x${v}`);
+        bindSliderLabel('paramScaleFactor', 'valScaleFactor', v => parseFloat(v).toFixed(2));
+        bindSliderLabel('paramMinNeighbors', 'valMinNeighbors');
+        bindSliderLabel('paramMinSize', 'valMinSize', v => `${v}x${v}`);
+
+        // Tab Switching Logic
+        function switchTab(tab) {
+            const tab1 = document.getElementById('tabPreprocessing');
+            const tab2 = document.getElementById('tabCascade');
+            const btn1 = document.getElementById('tabBtn1');
+            const btn2 = document.getElementById('tabBtn2');
+
+            if (tab === 'preprocessing') {
+                tab1.classList.remove('hidden');
+                tab2.classList.add('hidden');
+                btn1.className = "flex-1 py-3 text-xs font-semibold border-b-2 border-sky-400 text-sky-400 flex items-center justify-center gap-1.5 transition";
+                btn2.className = "flex-1 py-3 text-xs font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-200 flex items-center justify-center gap-1.5 transition";
+            } else {
+                tab2.classList.remove('hidden');
+                tab1.classList.add('hidden');
+                btn2.className = "flex-1 py-3 text-xs font-semibold border-b-2 border-sky-400 text-sky-400 flex items-center justify-center gap-1.5 transition";
+                btn1.className = "flex-1 py-3 text-xs font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-200 flex items-center justify-center gap-1.5 transition";
+            }
+        }
+
+        // OpenCV Ready Callback
+        function onOpenCvReady() {
+            cvStatus.className = "flex items-center gap-2 bg-emerald-500/20 text-emerald-300 px-3 py-1.5 rounded-full border border-emerald-500/30";
+            cvStatus.innerHTML = `<i class="fa-solid fa-check"></i><span class="text-xs font-semibold">OpenCV.js Ready</span>`;
+            cvReady = true;
+            btnStartCam.disabled = false;
+
+            // Load Default Cascade XML
+            loadCascadeModel(currentModelPath);
+        }
+
+        // Load Cascade XML file into OpenCV Virtual Filesystem
+        async function loadCascadeModel(modelName) {
+            classifierLoaded = false;
+            const url = `https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/${modelName}`;
+            
+            try {
+                cvStatus.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i><span class="text-xs font-semibold">Memuat Classifier...</span>`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Gagal mengunduh cascade XML');
+                const buffer = await response.arrayBuffer();
+                const data = new Uint8Array(buffer);
+
+                cv.FS_createDataFile('/', modelName, data, true, false, false);
+                
+                if (classifier) classifier.delete();
+                classifier = new cv.CascadeClassifier();
+                classifier.load(modelName);
+
+                classifierLoaded = true;
+                cvStatus.className = "flex items-center gap-2 bg-emerald-500/20 text-emerald-300 px-3 py-1.5 rounded-full border border-emerald-500/30";
+                cvStatus.innerHTML = `<i class="fa-solid fa-check"></i><span class="text-xs font-semibold">Model ${modelName.replace('haarcascade_', '').replace('.xml', '')} Siap</span>`;
+            } catch (err) {
+                console.error(err);
+                cvStatus.className = "flex items-center gap-2 bg-red-500/20 text-red-300 px-3 py-1.5 rounded-full border border-red-500/30";
+                cvStatus.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i><span class="text-xs font-semibold">Gagal Muat Model</span>`;
+            }
+        }
+
+        // Change Model Event
+        paramCascadeModel.addEventListener('change', (e) => {
+            currentModelPath = e.target.value;
+            loadCascadeModel(currentModelPath);
+        });
+
+        // Initialize Webcam Stream
+        btnStartCam.addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+                    audio: false
+                });
+                video.srcObject = stream;
+                video.play();
+                cameraShield.classList.add('hidden');
+                
+                video.addEventListener('loadedmetadata', () => {
+                    initOpenCVBuffers();
+                    requestAnimationFrame(processVideoFrame);
+                });
+            } catch (err) {
+                alert("Gagal mengakses kamera: " + err.message);
+            }
+        });
+
+        // Allocate OpenCV Mats once
+        function initOpenCVBuffers() {
+            const width = video.videoWidth || 640;
+            const height = video.videoHeight || 480;
+
+            canvasOutput.width = width;
+            canvasOutput.height = height;
+            canvasPreprocessed.width = width;
+            canvasPreprocessed.height = height;
+
+            srcMat = new cv.Mat(height, width, cv.CV_8UC4);
+            dstMat = new cv.Mat(height, width, cv.CV_8UC4);
+            grayMat = new cv.Mat(height, width, cv.CV_8UC1);
+            procMat = new cv.Mat(height, width, cv.CV_8UC1);
+            faces = new cv.RectVector();
+        }
+
+        // Convert HEX color to OpenCV Scalar RGB
+        function hexToRgbScalar(hex) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return new cv.Scalar(r, g, b, 255);
+        }
+
+        // Reset Parameters
+        document.getElementById('btnResetParams').addEventListener('click', () => {
+            paramBrightness.value = 0;
+            paramContrast.value = 1.0;
+            paramThreshType.value = "none";
+            paramThreshValue.value = 127;
+            paramMorphType.value = "none";
+            paramKernelSize.value = 3;
+            paramScaleFactor.value = 1.1;
+            paramMinNeighbors.value = 3;
+            paramMinSize.value = 30;
+
+            // Trigger events to update labels
+            ['paramBrightness', 'paramContrast', 'paramThreshValue', 'paramKernelSize', 'paramScaleFactor', 'paramMinNeighbors', 'paramMinSize'].forEach(id => {
+                document.getElementById(id).dispatchEvent(new Event('input'));
+            });
+        });
+
+        // Core Image Processing & Detection Loop
+        function processVideoFrame() {
+            if (!stream || video.paused || video.ended) return;
+
+            const now = performance.now();
+            frameCount++;
+            if (now - lastFrameTime >= 1000) {
+                currentFps = Math.round((frameCount * 1000) / (now - lastFrameTime));
+                document.getElementById('fpsCount').textContent = currentFps;
+                frameCount = 0;
+                lastFrameTime = now;
+            }
+
+            // 1. Read Video Frame to srcMat
+            const ctx = canvasOutput.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(video, 0, 0, canvasOutput.width, canvasOutput.height);
+            let imgData = ctx.getImageData(0, 0, canvasOutput.width, canvasOutput.height);
+            srcMat.data.set(imgData.data);
+
+            // 2. Brightness & Contrast Adjustment: dst = alpha * src + beta
+            const alpha = parseFloat(paramContrast.value);
+            const beta = parseFloat(paramBrightness.value);
+            srcMat.convertTo(dstMat, -1, alpha, beta);
+
+            // 3. Convert to Grayscale
+            cv.cvtColor(dstMat, grayMat, cv.COLOR_RGBA2GRAY);
+
+            // 4. Thresholding Operations
+            const threshType = paramThreshType.value;
+            const threshVal = parseFloat(paramThreshValue.value);
+
+            if (threshType === 'binary') {
+                cv.threshold(grayMat, procMat, threshVal, 255, cv.THRESH_BINARY);
+            } else if (threshType === 'binary_inv') {
+                cv.threshold(grayMat, procMat, threshVal, 255, cv.THRESH_BINARY_INV);
+            } else if (threshType === 'otsu') {
+                cv.threshold(grayMat, procMat, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
+            } else if (threshType === 'adaptive') {
+                cv.adaptiveThreshold(grayMat, procMat, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2);
+            } else {
+                grayMat.copyTo(procMat);
+            }
+
+            // 5. Morphological Operations
+            const morphType = paramMorphType.value;
+            const kSize = parseInt(paramKernelSize.value);
+
+            if (morphType !== 'none') {
+                let M = cv.Mat.ones(kSize, kSize, cv.CV_8U);
+                let anchor = new cv.Point(-1, -1);
+
+                if (morphType === 'erode') {
+                    cv.erode(procMat, procMat, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+                } else if (morphType === 'dilate') {
+                    cv.dilate(procMat, procMat, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+                } else if (morphType === 'open') {
+                    cv.morphologyEx(procMat, procMat, cv.MORPH_OPEN, M);
+                } else if (morphType === 'close') {
+                    cv.morphologyEx(procMat, procMat, cv.MORPH_CLOSE, M);
+                }
+                M.delete();
+            }
+
+            // Render Preprocessed Mat to preprocessed canvas
+            cv.imshow('canvasPreprocessed', procMat);
+
+            // 6. Haar Cascade Object Detection
+            let detectedCount = 0;
+
+            if (toggleDetection.checked && classifierLoaded) {
+                const inputForDetection = useProcessedForDetect.checked ? procMat : grayMat;
+                const scaleFactor = parseFloat(paramScaleFactor.value);
+                const minNeighbors = parseInt(paramMinNeighbors.value);
+                const minSizeVal = parseInt(paramMinSize.value);
+                const minSize = new cv.Size(minSizeVal, minSizeVal);
+
+                // Run Detector
+                classifier.detectMultiScale(inputForDetection, faces, scaleFactor, minNeighbors, 0, minSize);
+                detectedCount = faces.size();
+
+                // Draw bounding boxes on primary canvas
+                const boxColor = hexToRgbScalar(paramBoxColor.value);
+                for (let i = 0; i < faces.size(); ++i) {
+                    let face = faces.get(i);
+                    let point1 = new cv.Point(face.x, face.y);
+                    let point2 = new cv.Point(face.x + face.width, face.y + face.height);
+                    cv.rectangle(dstMat, point1, point2, boxColor, 2);
+                }
+            }
+
+            document.getElementById('detectCount').textContent = detectedCount;
+
+            // Render RGB Overlay to main canvas
+            cv.imshow('canvasOutput', dstMat);
+
+            // Loop next frame
+            requestAnimationFrame(processVideoFrame);
+        }
+    </script>
+
+    <!-- Load OpenCV.js Async -->
+    <script async src="https://docs.opencv.org/4.7.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+</body>
+</html>
