@@ -1,104 +1,906 @@
 <!DOCTYPE html>
-<html lang="id" class="dark">
+<html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistem Presensi Wajah Vektor 468 Landmark (NCC & IOD)</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: { 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1' }
-          }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Presensi Wajah MediaPipe</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- MediaPipe Face Mesh & Camera Utils via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
         }
-      }
-    }
-  </script>
-  <!-- MediaPipe Tasks Vision SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm/vision_bundle.js" crossorigin="anonymous"></script>
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            aspect-ratio: 4/3;
+            margin: 0 auto;
+            border-radius: 1rem;
+            overflow: hidden;
+            background-color: #1e293b;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+        video, canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        /* Video mirroring */
+        .mirror {
+            transform: scaleX(-1);
+        }
+    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col antialiased">
+<body class="min-h-screen flex flex-col justify-between">
 
-  <!-- Header -->
-  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
-      <div class="flex items-center space-x-3">
-        <div class="p-2 bg-sky-600/20 text-sky-400 rounded-lg border border-sky-500/30">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+    <!-- Header Section -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2 rounded-xl text-white">
+                    <i class="fa-solid me-1 fa-user-shield text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white leading-tight">FaceID Attendance</h1>
+                    <p class="text-xs text-slate-400">MediaPipe 468-Landmark Vector System</p>
+                </div>
+            </div>
+            <!-- Navigation Tabs -->
+            <nav class="flex space-x-2 bg-slate-800/80 p-1 rounded-xl border border-slate-700/50">
+                <button id="tabScanBtn" onclick="switchTab('scan')" class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all bg-indigo-600 text-white shadow-md">
+                    <i class="fa-solid fa-camera mr-1.5"></i> Mode Presensi
+                </button>
+                <button id="tabEnrollBtn" onclick="switchTab('enroll')" class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-700">
+                    <i class="fa-solid fa-user-plus mr-1.5"></i> Daftar User
+                </button>
+                <button id="tabLogsBtn" onclick="switchTab('logs')" class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-700">
+                    <i class="fa-solid fa-clock-rotate-left mr-1.5"></i> Riwayat
+                </button>
+            </nav>
         </div>
-        <div>
-          <h1 class="text-lg font-bold text-slate-100 leading-tight">Presensi Wajah AI (NCC & IOD Normalized)</h1>
-          <p class="text-xs text-slate-400">MediaPipe 468 Mesh • Algoritma NCC • Normalisasi IOD • IndexedDB</p>
-        </div>
-      </div>
+    </header>
 
-      <div class="flex items-center gap-4">
-        <div class="text-right hidden sm:block">
-          <div id="live-clock" class="font-mono text-sm font-semibold text-sky-400">00:00:00</div>
-          <div id="live-date" class="text-[10px] text-slate-400">Memuat tanggal...</div>
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+        
+        <!-- Status Indicator Banner -->
+        <div id="modelStatusBanner" class="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-amber-400">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-circle-notch fa-spin text-xl"></i>
+                <div>
+                    <p class="font-semibold text-sm">Memuat Model AI MediaPipe FaceMesh...</p>
+                    <p class="text-xs opacity-80">Mohon tunggu sebentar sampai kamera dan pendeteksi wajah siap.</p>
+                </div>
+            </div>
         </div>
-        <div id="status-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
-          <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-          <span>Inisialisasi Model...</span>
-        </div>
-      </div>
+
+        <!-- SECTION 1: SCAN / ATTENDANCE MODE -->
+        <section id="scanSection" class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Video & Overlay Panel -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="canvas-container relative">
+                        <video id="scanVideo" class="mirror" playsinline></video>
+                        <canvas id="scanCanvas" class="mirror"></canvas>
+
+                        <!-- Visual Target Frame Guide Overlay -->
+                        <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                            <div class="w-64 h-80 border-2 border-dashed border-indigo-400/40 rounded-full flex items-center justify-center">
+                                <span class="text-xs text-indigo-300/60 bg-slate-900/60 px-2 py-1 rounded">Posisikan Wajah Di Sini</span>
+                            </div>
+                        </div>
+
+                        <!-- Scan Status Badge -->
+                        <div id="scanOverlayStatus" class="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur border border-slate-700 p-3 rounded-xl flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div id="statusDot" class="w-3 h-3 rounded-full bg-slate-500"></div>
+                                <div>
+                                    <p id="statusText" class="text-sm font-semibold text-slate-200">Mencari Wajah...</p>
+                                    <p id="distanceMetric" class="text-xs text-slate-400">Distance Metric: -</p>
+                                </div>
+                            </div>
+                            <span id="matchConfidenceBadge" class="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 font-mono">
+                                Score: 0.00
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Log Sidebar -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+                            <h2 class="font-bold text-slate-100 flex items-center gap-2">
+                                <i class="fa-solid fa-bolt text-indigo-400"></i> Presensi Real-Time
+                            </h2>
+                            <span class="text-xs px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">Live</span>
+                        </div>
+
+                        <!-- Last Detected User Card -->
+                        <div id="lastDetectedCard" class="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 mb-4 hidden">
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-full bg-indigo-600/20 text-indigo-400 flex items-center justify-center text-xl font-bold border border-indigo-500/30">
+                                    <i class="fa-solid fa-user-check"></i>
+                                </div>
+                                <div>
+                                    <h3 id="lastUserName" class="font-bold text-white text-base">---</h3>
+                                    <p id="lastUserId" class="text-xs text-slate-400">ID: ---</p>
+                                    <p id="lastUserTime" class="text-xs text-indigo-400 mt-1 font-mono">---</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick System Stats -->
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div class="bg-slate-800/40 border border-slate-800 p-3 rounded-xl">
+                                <p class="text-xs text-slate-400">Terdaftar</p>
+                                <p id="totalUsersCount" class="text-xl font-bold text-slate-100">0</p>
+                            </div>
+                            <div class="bg-slate-800/40 border border-slate-800 p-3 rounded-xl">
+                                <p class="text-xs text-slate-400">Presensi Hari Ini</p>
+                                <p id="todayLogsCount" class="text-xl font-bold text-indigo-400">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/30 p-3 rounded-xl border border-slate-800 text-xs text-slate-400 space-y-1">
+                        <p><i class="fa-solid fa-circle-info text-indigo-400 mr-1"></i> Cooldown antar presensi: <b>8 Detik</b>.</p>
+                        <p><i class="fa-solid fa-sliders text-indigo-400 mr-1"></i> Ambang Vektor Threshold: <b>0.15</b></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: USER ENROLMENT MODE -->
+        <section id="enrollSection" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Camera Feed for Capturing -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="canvas-container relative">
+                        <video id="enrollVideo" class="mirror" playsinline></video>
+                        <canvas id="enrollCanvas" class="mirror"></canvas>
+                        
+                        <!-- Sample Stepper Indicator Bar -->
+                        <div class="absolute top-4 left-4 right-4 bg-slate-900/80 backdrop-blur p-3 rounded-xl border border-slate-700/80 flex justify-between items-center">
+                            <span class="text-xs font-semibold text-slate-300">Pengambilan Sampel Wajah (3 Sudut)</span>
+                            <div class="flex gap-2">
+                                <span id="sampleBadge1" class="px-2.5 py-1 text-xs rounded-lg bg-slate-800 border border-slate-700 text-slate-400">1: Depan</span>
+                                <span id="sampleBadge2" class="px-2.5 py-1 text-xs rounded-lg bg-slate-800 border border-slate-700 text-slate-400">2: Serong Kiri</span>
+                                <span id="sampleBadge3" class="px-2.5 py-1 text-xs rounded-lg bg-slate-800 border border-slate-700 text-slate-400">3: Serong Kanan</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Registration Form Side Panel -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
+                    <form id="enrollForm" class="space-y-4" onsubmit="event.preventDefault();">
+                        <h2 class="font-bold text-slate-100 text-lg border-b border-slate-800 pb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-id-card text-indigo-400"></i> Form Pendaftaran
+                        </h2>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">ID / NIM / NIK</label>
+                            <input type="text" id="inputUserId" required placeholder="Contoh: USR-1002" class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Nama Lengkap</label>
+                            <input type="text" id="inputUserName" required placeholder="Contoh: Budi Santoso" class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+                        </div>
+
+                        <!-- Sample capture button & controls -->
+                        <div class="pt-2 space-y-2">
+                            <button type="button" id="btnCaptureSample" onclick="captureSampleStep()" class="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-camera font-lg"></i>
+                                <span id="btnCaptureText">Ambil Sampel 1 (Depan)</span>
+                            </button>
+
+                            <button type="button" id="btnResetEnroll" onclick="resetEnrollment()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-2 px-3 rounded-xl border border-slate-700 transition-colors">
+                                <i class="fa-solid fa-rotate-left mr-1"></i> Reset Ambil Sampel
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="mt-6 pt-4 border-t border-slate-800 text-xs text-slate-400 leading-relaxed">
+                        <p class="font-semibold text-slate-300 mb-1"><i class="fa-solid fa-shield-halved text-emerald-400 mr-1"></i> Privasi Aman</p>
+                        Data landmark wajah disimpan dalam bentuk <b>Vektor Normalisasi 3D (468 Titik)</b> di penyimpanan lokal IndexedDB browser pengguna. Tidak ada data foto bitmap yang disimpan.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: LOGS & DATA MANAGEMENT TABLE -->
+        <section id="logsSection" class="hidden space-y-6">
+            <!-- Attendance History Table -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="font-bold text-slate-100 text-lg flex items-center gap-2">
+                            <i class="fa-solid fa-clipboard-user text-indigo-400"></i> Riwayat Presensi Wajah
+                        </h2>
+                        <p class="text-xs text-slate-400">Catatan log keberhasilan deteksi presensi real-time</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="exportLogsCSV()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all">
+                            <i class="fa-solid fa-file-csv"></i> Ekspor CSV
+                        </button>
+                        <button onclick="clearAllLogs()" class="px-3.5 py-2 bg-rose-600/20 border border-rose-500/30 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all">
+                            <i class="fa-solid fa-trash-can"></i> Hapus Log
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead class="bg-slate-800/80 text-xs uppercase text-slate-400 font-semibold border-b border-slate-700">
+                            <tr>
+                                <th class="px-4 py-3 rounded-l-xl">Waktu</th>
+                                <th class="px-4 py-3">ID User</th>
+                                <th class="px-4 py-3">Nama Lengkap</th>
+                                <th class="px-4 py-3">Vector Distance Metric</th>
+                                <th class="px-4 py-3 rounded-r-xl">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody" class="divide-y divide-slate-800">
+                            <!-- Rows injected dynamically -->
+                            <tr>
+                                <td colspan="5" class="text-center py-6 text-slate-500 text-xs">Belum ada catatan presensi.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Registered Users Table -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="font-bold text-slate-100 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-users text-indigo-400"></i> Daftar User Terdaftar
+                    </h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead class="bg-slate-800/80 text-xs uppercase text-slate-400 font-semibold border-b border-slate-700">
+                            <tr>
+                                <th class="px-4 py-3 rounded-l-xl">ID User</th>
+                                <th class="px-4 py-3">Nama</th>
+                                <th class="px-4 py-3">Jumlah Sampel Vektor</th>
+                                <th class="px-4 py-3 rounded-r-xl">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody" class="divide-y divide-slate-800">
+                            <!-- Rows injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900/50 border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
+        <p>Sistem Presensi Wajah Real-time &bull; Powered by MediaPipe FaceMesh (468 Keypoints) & IndexedDB</p>
+    </footer>
+
+    <!-- Custom Notification Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 max-w-sm bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl transition-all transform translate-y-20 opacity-0 z-50 flex items-center gap-3">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-xl"></i>
+        <span id="toastMsg" class="text-sm font-medium">Notifikasi</span>
     </div>
-  </header>
 
-  <!-- Main Grid -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Application Script Logic -->
+    <script>
+        /* ==========================================================================
+           1. GLOBAL STATE & SYSTEM CONSTANTS
+           ========================================================================== */
+        const DB_NAME = 'AttendanceFaceDB';
+        const DB_VERSION = 1;
+        const VECTOR_MATCH_THRESHOLD = 0.16; // Euclidean distance threshold for match
+        const ATTENDANCE_COOLDOWN_MS = 8000;  // 8 seconds cooldown per user
 
-    <!-- Area Video Kamera -->
-    <section class="lg:col-span-7 xl:col-span-8 space-y-4">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl relative overflow-hidden">
-        
-        <div class="relative aspect-video bg-slate-950 rounded-xl overflow-hidden border border-slate-800/80 flex items-center justify-center">
-          <video id="webcam" autoplay playsinline class="w-full h-full object-cover transform -scale-x-100"></video>
-          <canvas id="overlay" class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"></canvas>
-          
-          <!-- Status Deteksi / Alert Banner -->
-          <div id="detection-banner" class="absolute bottom-4 left-4 right-4 p-3.5 rounded-xl text-center font-semibold text-sm backdrop-blur-md transition-all duration-300 hidden border shadow-2xl"></div>
+        let db = null;
+        let faceMesh = null;
+        let activeCamera = null;
+        let currentTab = 'scan';
 
-          <!-- Video Fallback -->
-          <div id="cam-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-slate-500 space-y-2">
-            <svg class="w-12 h-12 stroke-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-            <p class="text-xs">Klik "Aktifkan Kamera" untuk mulai memindai</p>
-          </div>
-        </div>
+        // Landmark Vector Enrolment State
+        let capturedSamples = []; // Holds 3 normalized landmark vector arrays
+        let currentFrameLandmarks = null;
 
-        <div class="mt-4 flex flex-wrap gap-3 items-center justify-between pt-2 border-t border-slate-800">
-          <div class="flex items-center gap-3">
-            <button id="btn-toggle-cam" class="bg-sky-600 hover:bg-sky-500 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition shadow-lg shadow-sky-600/20 flex items-center gap-2">
-              <span>Aktifkan Kamera</span>
-            </button>
-            <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-slate-800/60 px-3.5 py-2.5 rounded-xl border border-slate-700/60 hover:bg-slate-800 transition">
-              <input type="checkbox" id="chk-mesh" checked class="rounded border-slate-700 text-sky-500 focus:ring-0">
-              Mesh 468 Landmark
-            </label>
-          </div>
-          <div class="text-xs text-slate-400 font-mono bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800" id="fps-counter">
-            FPS: --
-          </div>
-        </div>
+        // Registered Users Cache in Memory for Instant Match Comparison
+        let registeredUsersCache = [];
+        let lastAttendanceMap = new Map(); // UserID -> timestamp
 
-      </div>
-    </section>
+        /* ==========================================================================
+           2. INDEXEDDB SETUP & OPERATIONS
+           ========================================================================== */
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    <!-- Controls, Enroll & Logs -->
-    <section class="lg:col-span-5 xl:col-span-4 space-y-4">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-full">
-        
-        <div class="grid grid-cols-2 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 mb-4">
-          <button id="tab-btn-logs" class="py-2 px-3 text-xs font-semibold rounded-lg text-white bg-slate-800 shadow transition">
-            Log Presensi
-          </button>
-          <button id="tab-btn-enroll" class="py-2 px-3 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition">
-            Enroll User Baru
-          </button>
-        </div>
+                request.onupgradeneeded = (e) => {
+                    const database = e.target.result;
+                    // Store 1: Users (id, name, vectors)
+                    if (!database.objectStoreNames.contains('users')) {
+                        database.createObjectStore('users', { keyPath: 'id' });
+                    }
+                    // Store 2: Logs (auto-increment id)
+                    if (!database.objectStoreNames.contains('logs')) {
+                        database.createObjectStore('logs', { keyPath: 'logId', autoIncrement: true });
+                    }
+                };
 
-        <!-- Tab 1: Log Presensi -->
-        <div id
+                request.onsuccess = (e) => {
+                    db = e.target.result;
+                    loadUsersCache();
+                    renderLogsTable();
+                    renderUsersTable();
+                    resolve(db);
+                };
+
+                request.onerror = (e) => {
+                    console.error('IndexedDB Error:', e.target.error);
+                    showToast('Gagal membuka IndexedDB', 'error');
+                    reject(e.target.error);
+                };
+            });
+        }
+
+        function loadUsersCache() {
+            if (!db) return;
+            const tx = db.transaction('users', 'readonly');
+            const store = tx.objectStore('users');
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                registeredUsersCache = request.result || [];
+                document.getElementById('totalUsersCount').innerText = registeredUsersCache.length;
+                renderUsersTable();
+            };
+        }
+
+        function saveUserToDB(userObj) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('users', 'readwrite');
+                const store = tx.objectStore('users');
+                const req = store.put(userObj);
+
+                req.onsuccess = () => {
+                    loadUsersCache();
+                    resolve(true);
+                };
+                req.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        function deleteUserFromDB(userId) {
+            if (!confirm(`Hapus user dengan ID: ${userId}?`)) return;
+            const tx = db.transaction('users', 'readwrite');
+            const store = tx.objectStore('users');
+            store.delete(userId).onsuccess = () => {
+                showToast(`User ${userId} berhasil dihapus`, 'success');
+                loadUsersCache();
+            };
+        }
+
+        function saveLogToDB(logObj) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('logs', 'readwrite');
+                const store = tx.objectStore('logs');
+                const req = store.add(logObj);
+
+                req.onsuccess = () => {
+                    renderLogsTable();
+                    resolve(true);
+                };
+                req.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        function renderLogsTable() {
+            if (!db) return;
+            const tx = db.transaction('logs', 'readonly');
+            const store = tx.objectStore('logs');
+            const req = store.getAll();
+
+            req.onsuccess = () => {
+                const logs = req.result.reverse(); // Newest first
+                const tbody = document.getElementById('logsTableBody');
+                
+                // Update today's logs counter
+                const todayStr = new Date().toDateString();
+                const todayLogs = logs.filter(l => new Date(l.timestamp).toDateString() === todayStr);
+                document.getElementById('todayLogsCount').innerText = todayLogs.length;
+
+                if (logs.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-500 text-xs">Belum ada catatan presensi.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = logs.map(log => `
+                    <tr class="hover:bg-slate-800/40 transition-colors">
+                        <td class="px-4 py-3 font-mono text-xs text-slate-400">${new Date(log.timestamp).toLocaleString('id-ID')}</td>
+                        <td class="px-4 py-3 font-semibold text-slate-200">${log.userId}</td>
+                        <td class="px-4 py-3 text-white">${log.userName}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-indigo-400">${log.distance.toFixed(4)}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-0.5 text-xs rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">
+                                Sukses
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+            };
+        }
+
+        function renderUsersTable() {
+            const tbody = document.getElementById('usersTableBody');
+            if (registeredUsersCache.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-500 text-xs">Belum ada user terdaftar.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = registeredUsersCache.map(user => `
+                <tr class="hover:bg-slate-800/40 transition-colors">
+                    <td class="px-4 py-3 font-mono text-xs font-semibold text-indigo-400">${user.id}</td>
+                    <td class="px-4 py-3 text-white font-medium">${user.name}</td>
+                    <td class="px-4 py-3 text-xs text-slate-400">${user.vectors.length} Vektor Sampel</td>
+                    <td class="px-4 py-3">
+                        <button onclick="deleteUserFromDB('${user.id}')" class="text-xs text-rose-400 hover:text-rose-300 transition-colors">
+                            <i class="fa-solid fa-trash mr-1"></i> Hapus
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function clearAllLogs() {
+            if (!confirm('Apakah Anda yakin ingin menghapus seluruh log presensi?')) return;
+            const tx = db.transaction('logs', 'readwrite');
+            tx.objectStore('logs').clear().onsuccess = () => {
+                showToast('Seluruh log presensi telah dibersihkan', 'info');
+                renderLogsTable();
+            };
+        }
+
+        function exportLogsCSV() {
+            if (!db) return;
+            const tx = db.transaction('logs', 'readonly');
+            tx.objectStore('logs').getAll().onsuccess = (e) => {
+                const logs = e.target.result;
+                if (logs.length === 0) {
+                    showToast('Tidak ada log untuk diekspor', 'warning');
+                    return;
+                }
+
+                let csv = 'Log ID,Timestamp,User ID,Nama User,Vector Distance\n';
+                logs.forEach(l => {
+                    csv += `"${l.logId}","${new Date(l.timestamp).toISOString()}","${l.userId}","${l.userName}","${l.distance}"\n`;
+                });
+
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.setAttribute('href', url);
+                a.setAttribute('download', `Presensi_Wajah_${new Date().toISOString().slice(0,10)}.csv`);
+                a.click();
+            };
+        }
+
+        /* ==========================================================================
+           3. VECTOR ALGEBRA & LANDMARK NORMALIZATION LOGIC
+           ========================================================================= */
+        /**
+         * Normalizes 468 landmark 3D points relative to facial bounding center and scale
+         * (Scale & position invariant feature extraction)
+         */
+        function normalizeLandmarks(landmarks) {
+            // Anchor Points: Nose Tip (#1), Left Eye (#33), Right Eye (#263)
+            const noseTip = landmarks[1];
+            
+            // Calculate scale reference (Distance between outer corners of eyes: landmark 33 and 263)
+            const leftEye = landmarks[33];
+            const rightEye = landmarks[263];
+            const eyeDistance = Math.hypot(
+                rightEye.x - leftEye.x,
+                rightEye.y - leftEye.y,
+                rightEye.z - leftEye.z
+            ) || 1.0;
+
+            // Shift origin to Nose Tip and scale to unit eye distance
+            const normalizedVector = [];
+            for (let i = 0; i < landmarks.length; i++) {
+                const pt = landmarks[i];
+                normalizedVector.push(
+                    (pt.x - noseTip.x) / eyeDistance,
+                    (pt.y - noseTip.y) / eyeDistance,
+                    (pt.z - noseTip.z) / eyeDistance
+                );
+            }
+            return normalizedVector;
+        }
+
+        /**
+         * Computes Euclidean Distance between two normalized feature vectors
+         */
+        function calculateEuclideanDistance(vecA, vecB) {
+            let sumSq = 0;
+            for (let i = 0; i < vecA.length; i++) {
+                const diff = vecA[i] - vecB[i];
+                sumSq += diff * diff;
+            }
+            return Math.sqrt(sumSq);
+        }
+
+        /**
+         * Compares real-time vector against all registered users' sample vectors
+         */
+        function matchFaceVector(liveVector) {
+            if (registeredUsersCache.length === 0) return null;
+
+            let bestMatch = null;
+            let minDistance = Infinity;
+
+            for (const user of registeredUsersCache) {
+                // Check distance against each of the 3 enrolled sample vectors
+                for (const storedVec of user.vectors) {
+                    const dist = calculateEuclideanDistance(liveVector, storedVec);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        bestMatch = {
+                            user: user,
+                            distance: dist
+                        };
+                    }
+                }
+            }
+
+            if (bestMatch && minDistance <= VECTOR_MATCH_THRESHOLD) {
+                return bestMatch;
+            }
+            return { user: null, distance: minDistance };
+        }
+
+        /* ==========================================================================
+           4. AUDIO FEEDBACK (WEB SPEECH SYNTHESIS)
+           ========================================================================== */
+        function speakAttendanceSuccess(userName) {
+            if ('speechSynthesis' in window) {
+                // Cancel existing speech queue to prevent backlog
+                window.speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(`Presensi berhasil, selamat datang ${userName}`);
+                utterance.lang = 'id-ID';
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        /* ==========================================================================
+           5. MEDIAPIPE FACE MESH INITIALIZATION & PIPELINE
+           ========================================================================== */
+        function initMediaPipe() {
+            faceMesh = new FaceMesh({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+            });
+
+            faceMesh.setOptions({
+                maxNumFaces: 1,
+                refineLandmarks: true,
+                minDetectionConfidence: 0.6,
+                minTrackingConfidence: 0.6
+            });
+
+            faceMesh.onResults(onFaceMeshResults);
+
+            // Hide loading banner once initialized
+            document.getElementById('modelStatusBanner').classList.add('hidden');
+        }
+
+        function onFaceMeshResults(results) {
+            const isScanMode = (currentTab === 'scan');
+            const videoEl = isScanMode ? document.getElementById('scanVideo') : document.getElementById('enrollVideo');
+            const canvasEl = isScanMode ? document.getElementById('scanCanvas') : document.getElementById('enrollCanvas');
+            const ctx = canvasEl.getContext('2d');
+
+            // Resize canvas to match video stream dimensions
+            if (videoEl.videoWidth && (canvasEl.width !== videoEl.videoWidth)) {
+                canvasEl.width = videoEl.videoWidth;
+                canvasEl.height = videoEl.videoHeight;
+            }
+
+            ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                const landmarks = results.multiFaceLandmarks[0];
+                currentFrameLandmarks = landmarks; // Cache latest frame landmarks
+
+                // Draw face mesh landmarks on canvas
+                drawLandmarks(ctx, landmarks, canvasEl.width, canvasEl.height);
+
+                // Mode 1: SCAN MODE PROCESSING
+                if (isScanMode) {
+                    const normalizedVec = normalizeLandmarks(landmarks);
+                    const matchResult = matchFaceVector(normalizedVec);
+
+                    const statusDot = document.getElementById('statusDot');
+                    const statusText = document.getElementById('statusText');
+                    const distanceMetric = document.getElementById('distanceMetric');
+                    const matchConfidenceBadge = document.getElementById('matchConfidenceBadge');
+
+                    if (matchResult && matchResult.user) {
+                        const user = matchResult.user;
+                        const dist = matchResult.distance;
+
+                        statusDot.className = 'w-3 h-3 rounded-full bg-emerald-500 animate-pulse';
+                        statusText.innerText = `Terdeteksi: ${user.name}`;
+                        statusText.className = 'text-sm font-bold text-emerald-400';
+                        distanceMetric.innerText = `ID: ${user.id} | Distance: ${dist.toFixed(4)}`;
+                        matchConfidenceBadge.innerText = `Score: ${(1 - dist).toFixed(2)}`;
+                        matchConfidenceBadge.className = 'text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30';
+
+                        // Process Attendance Record (Check Cooldown)
+                        triggerAttendanceLogging(user, dist);
+                    } else {
+                        const distVal = matchResult ? matchResult.distance : 0;
+                        statusDot.className = 'w-3 h-3 rounded-full bg-amber-500';
+                        statusText.innerText = 'Wajah Tidak Dikenal';
+                        statusText.className = 'text-sm font-semibold text-amber-400';
+                        distanceMetric.innerText = `Jarak Vektor Terdekat: ${distVal === Infinity ? '-' : distVal.toFixed(4)}`;
+                        matchConfidenceBadge.innerText = `Unrecognized`;
+                        matchConfidenceBadge.className = 'text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 font-mono';
+                    }
+                }
+            } else {
+                currentFrameLandmarks = null;
+                if (isScanMode) {
+                    document.getElementById('statusDot').className = 'w-3 h-3 rounded-full bg-slate-500';
+                    document.getElementById('statusText').innerText = 'Mencari Wajah...';
+                    document.getElementById('statusText').className = 'text-sm font-semibold text-slate-200';
+                    document.getElementById('distanceMetric').innerText = 'Distance Metric: -';
+                    document.getElementById('matchConfidenceBadge').innerText = 'Score: 0.00';
+                }
+            }
+        }
+
+        /**
+         * Render landmarks mesh on canvas
+         */
+        function drawLandmarks(ctx, landmarks, width, height) {
+            ctx.fillStyle = '#6366f1'; // Indigo points
+            for (let i = 0; i < landmarks.length; i += 2) { // Render half points for smooth performance
+                const pt = landmarks[i];
+                const x = pt.x * width;
+                const y = pt.y * height;
+                ctx.beginPath();
+                ctx.arc(x, y, 1.2, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+
+        /* ==========================================================================
+           6. ATTENDANCE EXECUTION LOGIC
+           ========================================================================== */
+        function triggerAttendanceLogging(user, distance) {
+            const now = Date.now();
+            const lastTime = lastAttendanceMap.get(user.id) || 0;
+
+            // Check Cooldown
+            if (now - lastTime < ATTENDANCE_COOLDOWN_MS) {
+                return; // Cooldown active, ignore
+            }
+
+            // Update timestamp cache
+            lastAttendanceMap.set(user.id, now);
+
+            // Save to IndexedDB
+            const logObj = {
+                userId: user.id,
+                userName: user.name,
+                timestamp: now,
+                distance: distance
+            };
+
+            saveLogToDB(logObj).then(() => {
+                // Voice Synthesis Output
+                speakAttendanceSuccess(user.name);
+
+                // Update UI Sidebar Card
+                document.getElementById('lastDetectedCard').classList.remove('hidden');
+                document.getElementById('lastUserName').innerText = user.name;
+                document.getElementById('lastUserId').innerText = `ID: ${user.id}`;
+                document.getElementById('lastUserTime').innerText = `Presensi: ${new Date().toLocaleTimeString('id-ID')}`;
+
+                showToast(`Presensi Berhasil: ${user.name}`, 'success');
+            });
+        }
+
+        /* ==========================================================================
+           7. USER ENROLMENT / REGISTRATION LOGIC
+           ========================================================================== */
+        function captureSampleStep() {
+            const userId = document.getElementById('inputUserId').value.trim();
+            const userName = document.getElementById('inputUserName').value.trim();
+
+            if (!userId || !userName) {
+                showToast('Mohon isi ID dan Nama Lengkap terlebih dahulu!', 'warning');
+                return;
+            }
+
+            if (!currentFrameLandmarks) {
+                showToast('Wajah tidak terdeteksi! Posisikan wajah tepat di depan kamera.', 'error');
+                return;
+            }
+
+            // Extract normalized 3D landmark vector
+            const normalizedVector = normalizeLandmarks(currentFrameLandmarks);
+            capturedSamples.push(normalizedVector);
+
+            const step = capturedSamples.length;
+            updateEnrollUI(step);
+
+            if (step === 1) {
+                showToast('Sampel 1 (Depan) berhasil diambil! Sekarang miringkan wajah sedikit ke Kiri.', 'info');
+            } else if (step === 2) {
+                showToast('Sampel 2 (Kiri) berhasil diambil! Sekarang miringkan wajah sedikit ke Kanan.', 'info');
+            } else if (step === 3) {
+                // Complete Registration
+                const newUser = {
+                    id: userId,
+                    name: userName,
+                    vectors: capturedSamples,
+                    registeredAt: Date.now()
+                };
+
+                saveUserToDB(newUser).then(() => {
+                    showToast(`Pendaftaran User ${userName} Berhasil!`, 'success');
+                    resetEnrollment();
+                    switchTab('scan');
+                }).catch(err => {
+                    showToast('Gagal menyimpan user: ' + err, 'error');
+                });
+            }
+        }
+
+        function updateEnrollUI(step) {
+            const btnText = document.getElementById('btnCaptureText');
+            const b1 = document.getElementById('sampleBadge1');
+            const b2 = document.getElementById('sampleBadge2');
+            const b3 = document.getElementById('sampleBadge3');
+
+            if (step === 0) {
+                btnText.innerText = 'Ambil Sampel 1 (Depan)';
+                b1.className = 'px-2.5 py-1 text-xs rounded-lg bg-slate-800 border border-slate-700 text-slate-400';
+                b2.className = 'px-2.5 py-1 text-xs rounded-lg bg-slate-800 border border-slate-700 text-slate-400';
+                b3.className = 'px-2.5 py-1 text-xs rounded-lg bg-slate-800 border border-slate-700 text-slate-400';
+            } else if (step === 1) {
+                btnText.innerText = 'Ambil Sampel 2 (Serong Kiri)';
+                b1.className = 'px-2.5 py-1 text-xs rounded-lg bg-emerald-500/20 border border-emerald-500 text-emerald-400 font-bold';
+            } else if (step === 2) {
+                btnText.innerText = 'Ambil Sampel 3 (Serong Kanan)';
+                b2.className = 'px-2.5 py-1 text-xs rounded-lg bg-emerald-500/20 border border-emerald-500 text-emerald-400 font-bold';
+            } else if (step === 3) {
+                b3.className = 'px-2.5 py-1 text-xs rounded-lg bg-emerald-500/20 border border-emerald-500 text-emerald-400 font-bold';
+            }
+        }
+
+        function resetEnrollment() {
+            capturedSamples = [];
+            document.getElementById('inputUserId').value = '';
+            document.getElementById('inputUserName').value = '';
+            updateEnrollUI(0);
+        }
+
+        /* ==========================================================================
+           8. CAMERA CONTROLLER & TAB SWITCHING
+           ========================================================================== */
+        function startCamera(videoElementId) {
+            if (activeCamera) {
+                activeCamera.stop();
+            }
+
+            const videoElement = document.getElementById(videoElementId);
+            activeCamera = new Camera(videoElement, {
+                onFrame: async () => {
+                    if (faceMesh) {
+                        await faceMesh.send({ image: videoElement });
+                    }
+                },
+                width: 640,
+                height: 480
+            });
+            activeCamera.start();
+        }
+
+        function switchTab(tabName) {
+            currentTab = tabName;
+
+            // Update Tab Button Styles
+            document.getElementById('tabScanBtn').className = tabName === 'scan' ? 
+                'px-4 py-1.5 rounded-lg text-sm font-semibold transition-all bg-indigo-600 text-white shadow-md' : 
+                'px-4 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-700';
+            
+            document.getElementById('tabEnrollBtn').className = tabName === 'enroll' ? 
+                'px-4 py-1.5 rounded-lg text-sm font-semibold transition-all bg-indigo-600 text-white shadow-md' : 
+                'px-4 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-700';
+
+            document.getElementById('tabLogsBtn').className = tabName === 'logs' ? 
+                'px-4 py-1.5 rounded-lg text-sm font-semibold transition-all bg-indigo-600 text-white shadow-md' : 
+                'px-4 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-700';
+
+            // Toggle Sections Visibility
+            document.getElementById('scanSection').classList.toggle('hidden', tabName !== 'scan');
+            document.getElementById('enrollSection').classList.toggle('hidden', tabName !== 'enroll');
+            document.getElementById('logsSection').classList.toggle('hidden', tabName !== 'logs');
+
+            // Switch Camera Stream Binding
+            if (tabName === 'scan') {
+                startCamera('scanVideo');
+            } else if (tabName === 'enroll') {
+                resetEnrollment();
+                startCamera('enrollVideo');
+            } else {
+                if (activeCamera) activeCamera.stop();
+            }
+        }
+
+        /* ==========================================================================
+           9. UI TOAST NOTIFICATION UTILITY
+           ========================================================================== */
+        let toastTimeout;
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.innerText = message;
+
+            if (type === 'success') {
+                toastIcon.className = 'fa-solid fa-circle-check text-emerald-400 text-xl';
+            } else if (type === 'error') {
+                toastIcon.className = 'fa-solid fa-circle-xmark text-rose-400 text-xl';
+            } else if (type === 'warning') {
+                toastIcon.className = 'fa-solid fa-triangle-exclamation text-amber-400 text-xl';
+            } else {
+                toastIcon.className = 'fa-solid fa-circle-info text-indigo-400 text-xl';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        /* ==========================================================================
+           10. INITIALIZATION ON WINDOW LOAD
+           ========================================================================== */
+        window.onload = async () => {
+            await initDB();
+            initMediaPipe();
+            startCamera('scanVideo');
+        };
+    </script>
+</body>
+</html>
